@@ -1,0 +1,139 @@
+---
+title: 'Project 2nd attempt'
+author: "Aashna"
+
+date: "November 18, 2021"
+output:
+  html_document: default
+  header-includes: \usepackage{color}
+fontsize: 12pt
+margin: 1in
+---
+
+
+```{r setup, echo=FALSE, message=F, warning=F}
+
+    rm(list = ls())
+#saving file to R files folder
+setwd("/Users/aashnarungta/SCU/EconometricswithR/R_files/Project")
+
+### Load the packages 
+    library(doBy)
+    library(dplyr)
+    library(foreign)
+    library(ggplot2)
+    library(knitr)
+    library(lmtest)
+    library(readstata13)
+    library(sandwich)
+    library(stargazer)
+    library(AER)
+    library(gdata)
+    library(wooldridge)
+    library(openintro)
+    library(tidyr)
+    library(tidyverse)
+
+cse=function(reg) {
+    rob=sqrt(diag(vcovHC(reg, type="HC1")))
+    return(rob)
+    }
+    
+```
+
+
+
+```{r data, echo=FALSE, message=F, warning=FALSE, include=FALSE}
+#loading the data
+student=read.csv("student-mat.csv", header=T, sep=",")
+student$urban <- ifelse(student$address == 'U', 1, 0)
+student$pstat <- ifelse(student$Pstatus == 'A', 1, 0)
+
+```
+
+
+```{r simple, echo=FALSE, message=F, warning=FALSE, comment=""}
+
+#Making new column aggregating the 3 Grades columns
+student <- student %>% rowwise() %>%
+  mutate(Grades_total = sum(c_across(G1:G3)))
+
+student$Grades <- with(student, (Grades_total / 60) * 100)
+
+
+
+ggplot(student, aes(x=Dalc, y=Grades)) + geom_point(col="blue") +
+        labs(title = "Daily Alc consumption on grades", x = "Daily Alcohol Consumption", y = "Grades", hjust=1, vjust=1) +
+        stat_smooth(method=lm, col = "red", se=FALSE)
+
+
+ggplot(student, aes(x=Walc, y=Grades)) + geom_point(col="blue") +
+        labs(title = "Weekly Alc consumption on grades", x = "Weekly Alcohol Consumption", y = "Grades", hjust=1, vjust=1) +
+        stat_smooth(method=lm, col = "red", se=FALSE)
+
+```
+
+
+```{r multiple, echo=FALSE, message=F, warning=FALSE, comment=""}
+
+# Inserting scatterplot graphs of Grades on other variables.
+
+reg1 = lm(Grades ~ Dalc, data = student)
+reg2 = lm(Grades ~ Dalc + absences, data = student)
+reg3 = lm(Grades ~ Dalc + absences + schoolsup , data = student)
+reg4 = lm(Grades ~ Dalc + absences + schoolsup+ internet, data = student)
+reg5 = lm(Grades ~ Dalc + absences + schoolsup+  internet + studytime, data = student)
+reg6 = lm(Grades ~ Dalc + absences + schoolsup + internet + studytime + traveltime , data = student)
+
+stargazer(reg1, reg2, reg3, reg4, reg5, reg6, se=list(cse(reg1), cse(reg2), cse(reg3), cse(reg4), cse(reg5), cse(reg6)), title="Grades against alcohol consumption", type="text", df=FALSE, digits=3)
+
+```
+
+Effect of alcohol consumption on grades:
+
+We first run the regression model 1 with grades on daily alcohol consumption and see it is significant at 10% level. Since the model is a simple linear model, we suspect omitted variable bias and add other regressors to analyse the best baseline specification model.
+
+As expected, we saw the fit of the model go up from 0.3% to 4.6% after adding other regressors. 
+
+We want to study if alcohol consumption affects the grades of a student. From the star table, we notice there's a negative correlation but it is not statistically significant at standard confidence levels. 
+
+From the regression table, we see absence from school too does not have a significant effect on the grades.
+However, we notice the extra educational support has a very significant effect on grades with a 1% level.
+Having internet also positively affects the grades with a significance level of 10%.
+We noticed that study time positively affects the grades and is statistically significant at 5% whereas the travel time affects the grades negatively and is significant at 5% level.
+
+To conclude, we reject our null hypothesis of alcohol consumption affecting grades. 
+
+Since alcohol consumption does not explain the variation in grades, we wanted to take a look at another variable: the romantic relationship status of each student. We ran some regressions where our variable of interest was romantic, and the y-variable was grades.
+
+```{r romantic, echo=FALSE, message=F, warning=FALSE, comment=""}
+
+romantic1 = lm(Grades ~ romantic, data = student)
+romantic2 = lm(Grades ~ romantic + studytime , data = student)
+#romantic3 = lm(Grades ~ romantic + famrel + Pstatus, data = student)
+romantic4 = lm(Grades ~ romantic + studytime+ goout, data = student)
+romantic5 = lm(Grades ~ romantic + studytime + goout + age , data = student)
+romantic6 = lm(Grades ~ romantic + studytime + goout + age +  address, data = student)
+romantic7 = lm(Grades ~ romantic + studytime + goout + age + address + sex, data = student)
+
+
+stargazer(romantic1, romantic2, romantic4, romantic5, romantic6, romantic7, se=list(cse(romantic1), cse(romantic2), cse(romantic4), cse(romantic5), cse(romantic6), cse(romantic7)), title="Grades against romantic lives", type="text", df=FALSE, digits=3)
+
+```
+
+In the above regressions, similar to the alcohol ones, we are looking at the grades of the same 395 students. We asked them about their relationship status, and created a dummy variable, where the variable takes a value of 1 if the student is in a romantic relationship, and 0 otherwise.
+
+In the simple regression, it was seen that a student in a relationship will have, on average, lower grades by 4%. We decided to add some control variables to the regression in order to analyze the results and avoid any cases of omitted variable bias. The variables we added are:
+
+1. Studytime - weekly study time. We added this as students in relationships are likely to be spending less time studying, and it is an important variable in determining school grades.
+
+2. Goout - How often does the student go out with friends, on a scale of 1-5. This variable likely affects the likelihood of a student being in a relationship, and also dictates how much attention the student is paying to their grades.
+
+3. Student age, from 15-22. This variable was important in determining how interested a student would be to have a romantic life.
+
+4. Address - a binary variable that takes value of 1 if the student lives in an urban environment, and 0 if the student lives in a rural home. We suspect that a student who lives in a rural area will be less likely to be in a romantic relationship.
+
+5. Sex - a binary variable that takes value of 1 if the student is male. We were curious to see if a student's sex affects their grades. 
+
+From the above regressions, we can see that the romance variable has a negative relationship with grades - that is, students in a romantic relationship have grades that are lower by about 3%, keeping all other variables constant. However, we must keep in mind that this model only explains 8.2% of the variation in grades, and that the Romance variable is statistically significant at 10%. However, the adjusted $R^2$ is the highest in this regression, and therefore we chose for it to be our baseline. 
+
